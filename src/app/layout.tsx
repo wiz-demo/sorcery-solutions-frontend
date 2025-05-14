@@ -27,6 +27,7 @@ export default function RootLayout({
       <head>
         <meta name="aws_client_id" content="AKIA6KJQR5EG6EUOCYVX" />
         <meta name="aws_client_secret" content="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" />
+        <meta name="gh_pat" content="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" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
