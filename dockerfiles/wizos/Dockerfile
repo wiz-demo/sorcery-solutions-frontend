@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-FROM registry.os.wiz.io/node:20 AS base
+FROM registry.os.test.wiz.io/node:20 AS base
 
 # Install dependencies only when needed
 FROM base AS deps
