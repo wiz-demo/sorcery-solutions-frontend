@@ -76,13 +76,6 @@ jobs:
           # WIZ_OS_CLIENT_ID: op://wiz-demo/tenant_adv-${{ env.DEPLOY_ENV == 'staging' && 'stg-' || '' }}-wizos-apk-credentials/username
           # WIZ_OS_CLIENT_SECRET: op://wiz-demo/tenant_adv-${{ env.DEPLOY_ENV == 'staging' && 'stg-' || '' }}-wizos-apk-credentials/credential
 
-      # - name: Normalize IMAGE_NAME for file paths
-      #   run: |
-      #     # Replace slashes with dashes for use in file paths (GAR allows slashes in repo paths, but filenames can't have them)
-      #     SANITIZED_NAME="${{ vars.IMAGE_NAME }}"
-      #     SANITIZED_NAME="${SANITIZED_NAME//\//-}"
-      #     echo "IMAGE_NAME_SANITIZED=${SANITIZED_NAME}" >> $GITHUB_ENV
-
       - name: Get Wiz CLI SHA256
         id: get-sha256
         run: |
