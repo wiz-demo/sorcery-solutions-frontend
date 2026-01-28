@@ -201,7 +201,7 @@ jobs:
         if: success() || (failure() && env.DEPLOY_ENV == 'develop')
         run: |
           sudo -E ${{ env.WIZCLI_PATH }} scan container-image "${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.dockerfile }}:${{ vars.IMAGE_TAG }}" \
-            --dockerfile "./dockerfile/${{ matrix.dockerfile }}/Dockerfile" \
+            --dockerfile "./docker/${{ matrix.dockerfile }}/Dockerfile" \
             --tag github_action_run_id=${{ github.run_id }} \
             --tag dockerfile=${{ matrix.dockerfile }} \
             --tag environment=${{ env.DEPLOY_ENV }} \
