@@ -3,13 +3,13 @@ name: Build/Scan/Push Containers
 on:
   workflow_dispatch:
     inputs:
-      environment:
-        description: 'Environment (overrides branch-based logic)'
+      tenant:
+        description: 'Tenant (overrides branch-based logic)'
         required: false
         type: choice
         options:
-        - advanced
-        - stgadvanced
+        - staging
+        - production
       versions:
         description: 'WizCLI version to use for scanning'
         required: true
@@ -21,7 +21,7 @@ on:
       - develop
     paths:
       - src/**
-      - dockerfiles/**
+      - docker/**
       - .github/workflows/build-scan-push.yml
 
 permissions:
@@ -90,15 +90,13 @@ jobs:
           echo "sha256=$WIZCLI_SHA256" >> $GITHUB_OUTPUT
 
       - name: Cache Wiz CLI Binary
-        uses: actions/cache@v4
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb  # v5.0.1
         with:
           path: ~/.wiz/wizcli
           key: ${{ runner.os }}-wizcli-${{ steps.get-sha256.outputs.sha256 }}
-          restore-keys: |
-            ${{ runner.os }}-wizcli-
 
       - name: Restore Wiz configuration and rules cache
-        uses: actions/cache@v4
+        uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb  # v5.0.1
         with:
           path: ~/.wiz/${{ (env.WIZ_ENV == '' || env.WIZ_ENV == 'app') && 'clusterFilesCache' || format('{0}_clusterFilesCache', env.WIZ_ENV) }}
           key: ${{ runner.os }}-wiz-config-${{ env.WIZ_ENV || 'default' }}-${{ env.DEPLOY_ENV }}
@@ -151,7 +149,7 @@ jobs:
             type=gha,scope=${{ env.IMAGE_NAME }}-${{ matrix.dockerfile }}
           cache-to: type=gha,mode=max,scope=${{ env.IMAGE_NAME }}-${{ matrix.dockerfile }}-${{ env.DEPLOY_ENV }}
           context: ./
-          file: ./dockerfiles/${{ matrix.dockerfile }}/Dockerfile
+          file: ./docker/${{ matrix.dockerfile }}/Dockerfile
           platforms: linux/amd64
           load: true
           push: false
@@ -164,14 +162,39 @@ jobs:
       - name: Install Wiz CLI
         if: success() || (failure() && env.DEPLOY_ENV == 'develop')
         run: |
-          if [ ! -f ~/.wiz/wizcli ]; then
-            echo "Downloading Wiz CLI..."
-            mkdir -p ~/.wiz
-            curl -o ~/.wiz/wizcli ${{ env.WIZCLI_URL }} && chmod +x ~/.wiz/wizcli
-            echo "Downloaded Wiz CLI with SHA256: ${{ steps.get-sha256.outputs.sha256 }}"
+          mkdir -p ~/.wiz
+          EXPECTED_SHA256="${{ steps.get-sha256.outputs.sha256 }}"
+          NEEDS_DOWNLOAD=false
+
+          if [ -f ~/.wiz/wizcli ]; then
+            echo "Cached Wiz CLI found, verifying SHA256..."
+            ACTUAL_SHA256=$(sha256sum ~/.wiz/wizcli | cut -d' ' -f1)
+            if [ "$ACTUAL_SHA256" = "$EXPECTED_SHA256" ]; then
+              echo "✓ Cached Wiz CLI SHA256 matches expected: $EXPECTED_SHA256"
+            else
+              echo "✗ Cached Wiz CLI SHA256 mismatch!"
+              echo "  Expected: $EXPECTED_SHA256"
+              echo "  Actual:   $ACTUAL_SHA256"
+              echo "  Re-downloading latest version..."
+              NEEDS_DOWNLOAD=true
+            fi
           else
-            echo "Using cached Wiz CLI with SHA256: ${{ steps.get-sha256.outputs.sha256 }}"
+            echo "No cached Wiz CLI found, downloading..."
+            NEEDS_DOWNLOAD=true
           fi
+
+          if [ "$NEEDS_DOWNLOAD" = true ]; then
+            curl -o ~/.wiz/wizcli ${{ env.WIZCLI_URL }} && chmod +x ~/.wiz/wizcli
+            DOWNLOADED_SHA256=$(sha256sum ~/.wiz/wizcli | cut -d' ' -f1)
+            echo "Downloaded Wiz CLI with SHA256: $DOWNLOADED_SHA256"
+            if [ "$DOWNLOADED_SHA256" != "$EXPECTED_SHA256" ]; then
+              echo "::error::Downloaded Wiz CLI SHA256 does not match expected!"
+              echo "::error::Expected: $EXPECTED_SHA256"
+              echo "::error::Got:      $DOWNLOADED_SHA256"
+              exit 1
+            fi
+          fi
+
           echo "WIZCLI_PATH=$HOME/.wiz/wizcli" >> $GITHUB_ENV
 
       - name: Run Wiz Security Scan
