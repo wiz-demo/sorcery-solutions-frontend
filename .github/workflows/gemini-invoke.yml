@@ -7,6 +7,15 @@ on:
         type: 'string'
         description: 'Any additional context from the request'
         required: false
+    secrets:
+      WIZWASHERS_APP_ID:
+        required: false
+      WIZWASHERS_APP_PRIVATE_KEY:
+        required: false
+      GEMINI_API_KEY:
+        required: false
+      GITHUB_TOKEN:
+        required: false
 
 concurrency:
   group: '${{ github.workflow }}-invoke-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'
@@ -27,8 +36,7 @@ jobs:
     steps:
       - name: 'Mint identity token'
         id: 'mint_identity_token'
-        if: |-
-          ${{ secrets.WIZWASHERS_APP_ID }}
+        if: ${{ secrets.WIZWASHERS_APP_ID != '' }}
         uses: 'actions/create-github-app-token@29824e69f54612133e76f7eaac726eef6c875baf' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ secrets.WIZWASHERS_APP_ID }}'
