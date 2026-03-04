@@ -36,7 +36,7 @@ env:
   IMAGE_NAME: "${{ github.event.repository.name }}"
 jobs:
   build-and-scan:
-    runs-on: builds-general
+    runs-on: ubuntu-latest
     strategy:
       matrix:
 
