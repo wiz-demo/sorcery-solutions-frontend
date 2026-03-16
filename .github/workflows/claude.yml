@@ -43,3 +43,6 @@ jobs:
           CLOUD_ML_REGION: us-east5
           VERTEX_REGION_CLAUDE_SONNET_4: us-east5
           VERTEX_REGION_CLAUDE_SONNET_4_20250514: us-east5
+          CLAUDE_CODE_IGNORE_USER_SETTINGS: "true"
+          CLAUDE_CODE_SKIP_CONFIG_CHECK: "true"
+          CLAUDE_CODE_USE_SANDBOX: "false"
