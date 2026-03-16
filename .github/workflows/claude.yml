@@ -32,18 +32,12 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - uses: anthropics/claude-code-action@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: anthropics/claude-code-action@v1
         with:
           # github_token: ${{ secrets.GITHUB_TOKEN }}
           trigger_phrase: "@claude"
-          show_full_output: "true"
           use_vertex: "true"
           claude_args: '--model claude-sonnet-4@20250514 --max-turns 10 --no-tool-search'
         env:
           ANTHROPIC_VERTEX_PROJECT_ID: ${{ steps.auth.outputs.project_id }}
           CLOUD_ML_REGION: us-east5
-          VERTEX_REGION_CLAUDE_SONNET_4: us-east5
-          VERTEX_REGION_CLAUDE_SONNET_4_20250514: us-east5
-          CLAUDE_CODE_IGNORE_USER_SETTINGS: "true"
-          CLAUDE_CODE_SKIP_CONFIG_CHECK: "true"
-          CLAUDE_CODE_USE_SANDBOX: "false"
