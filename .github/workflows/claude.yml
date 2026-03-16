@@ -37,8 +37,9 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           trigger_phrase: "@claude"
           use_vertex: "true"
-          claude_args: '--model claude-sonnet-4@20250514 --max-turns 10'
+          claude_args: '--model claude-sonnet-4@20250514 --max-turns 10 --no-tool-search'
         env:
           ANTHROPIC_VERTEX_PROJECT_ID: ${{ steps.auth.outputs.project_id }}
-          CLOUD_ML_REGION: global
-          VERTEX_REGION_CLAUDE_3_7_SONNET: us-east5
+          CLOUD_ML_REGION: us-east5
+          VERTEX_REGION_CLAUDE_SONNET_4: us-east5
+          VERTEX_REGION_CLAUDE_SONNET_4_20250514: us-east5
