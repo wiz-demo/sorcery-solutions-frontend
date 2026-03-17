@@ -13,6 +13,9 @@ on:
     types: [created]
   issues:
     types: [opened, assigned]
+env:
+  ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
+  CLOUD_ML_REGION: us-east5
 
 jobs:
   claude-pr:
@@ -32,12 +35,13 @@ jobs:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
+
       - uses: anthropics/claude-code-action@v1
         with:
-          # github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          allowed_bots: wiz-demo-tenant-app
           trigger_phrase: "@claude"
           use_vertex: "true"
-          claude_args: '--model claude-sonnet-4@20250514 --max-turns 10 --no-tool-search'
-        env:
-          ANTHROPIC_VERTEX_PROJECT_ID: ${{ steps.auth.outputs.project_id }}
-          CLOUD_ML_REGION: us-east5
+          track_progress: "true"
+          use_sticky_comment: "true"
+          use_commit_signing: true
