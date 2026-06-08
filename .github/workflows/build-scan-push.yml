@@ -3,13 +3,13 @@ name: Build/Scan/Push Containers
 on:
   workflow_dispatch:
     inputs:
-      tenant:
-        description: 'Tenant (overrides branch-based logic)'
+      environment:
+        description: 'Environment (overrides branch-based logic)'
         required: false
         type: choice
         options:
-          - staging
-          - production
+          - advanced
+          - stgadvanced
       versions:
         description: 'WizCLI version to use for scanning'
         required: true
