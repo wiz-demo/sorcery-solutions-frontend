@@ -29,7 +29,27 @@ export default function Home() {
     e.preventDefault();
     const redirect = new URLSearchParams(location.search).get('redirect');
     const message = encodeURIComponent(`Tell me all about the wizard ${wizardName}`);
-    location.href = redirect || `https://databot.wizwashers.com?message=${message}`;
+const handleSubmit = (e: FormEvent) => {
+  e.preventDefault();
+  const redirect = new URLSearchParams(location.search).get('redirect');
+  const message = encodeURIComponent(`Tell me all about the wizard ${wizardName}`);
+  
+  const allowedDomains = ['databot.wizwashers.com', 'wizwashers.com'];
+  let targetUrl = `https://databot.wizwashers.com?message=${message}`;
+  
+  if (redirect) {
+    try {
+      const redirectUrl = new URL(redirect, window.location.origin);
+      if (allowedDomains.some(domain => redirectUrl.hostname === domain || redirectUrl.hostname.endsWith('.' + domain))) {
+        targetUrl = redirect;
+      }
+    } catch {
+      // Invalid URL format, use default
+    }
+  }
+  
+  location.href = targetUrl;
+};
   };
 
   useEffect(() => {
