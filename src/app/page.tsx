@@ -18,11 +18,19 @@ interface Star {
   size: number;
 }
 
+const handleSubmit = (e: FormEvent, wizardName: string) => {
+  e.preventDefault();
+  const redirect = new URLSearchParams(location.search).get('redirect');
+  const message = encodeURIComponent(`Tell me all about the wizard ${wizardName}`);
+  location.href = redirect || `https://databot.wizwashers.com?message=${message}`;
+};
+
 export default function Home() {
   const [form, setForm] = useState<FormState>({ name: '', spell: '' });
   const [submitted, setSubmitted] = useState<boolean>(false);
   const [stars, setStars] = useState<Star[]>([]);
   const [yamlFile, setYamlFile] = useState<File | null>(null);
+  const [wizardName, setWizardName] = useState<string>('');
 
   useEffect(() => {
     const starArray: Star[] = Array.from({ length: 30 }, (_, n) => ({
@@ -154,6 +162,22 @@ export default function Home() {
             />
             <button type="submit" className="bg-blue-500 hover:bg-blue-600 text-white py-2 rounded-xl shadow-md">
               📜 Upload Spellbook
+            </button>
+          </form>
+
+          {/* Wizard Databot Form */}
+          <form onSubmit={(e) => handleSubmit(e, wizardName)} className="flex flex-col space-y-4 mt-6">
+            <h3 className="text-xl font-bold">Consult the Wizard Databot</h3>
+            <input
+              value={wizardName}
+              onChange={(e) => setWizardName(e.target.value)}
+              type="text"
+              placeholder="Enter a wizard's name"
+              className="p-2 rounded-lg bg-gray-200 text-black"
+              required
+            />
+            <button type="submit" className="bg-purple-500 hover:bg-purple-600 text-white py-2 rounded-xl shadow-md">
+              🤖 Ask the Databot
             </button>
           </form>
         </div>
