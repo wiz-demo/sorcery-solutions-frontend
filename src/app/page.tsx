@@ -90,6 +90,7 @@ export default function Home() {
         <div className="space-x-4">
           <Link href="/" className="hover:underline hover:text-pink-200">Home</Link>
           <Link href="/spellbook" className="hover:underline hover:text-pink-200">Spellbook</Link>
+          <Link href="/login" className="hover:underline hover:text-pink-200">Login</Link>
         </div>
       </nav>
 
