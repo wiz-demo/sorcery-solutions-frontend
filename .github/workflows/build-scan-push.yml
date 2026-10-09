@@ -34,10 +34,10 @@ env:
   DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'advanced') || (github.ref == 'refs/heads/develop' && 'stgadvanced') || (github.ref == 'refs/heads/staging' && 'stgadvanced') || 'stgadvanced' }}
   WIZ_ENV: "demo"
   IMAGE_NAME: "${{ github.event.repository.name }}"
-  IMAGE_REGISTRY: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || github.ref == 'refs/heads/main') && vars.GAR_PRODUCTION_REGISTRY || vars.GAR_STAGING_REGISTRY }}
-  REGISTRY_REGION: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || github.ref == 'refs/heads/main') && vars.GAR_PRODUCTION_REGION || vars.GAR_STAGING_REGION }}
-  WIF_PROVIDER: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || github.ref == 'refs/heads/main') && vars.GAR_PRODUCTION_WIF_PROVIDER || vars.GAR_STAGING_WIF_PROVIDER }}
-  WIF_SERVICE_ACCOUNT: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || github.ref == 'refs/heads/main') && vars.GAR_PRODUCTION_SERVICE_ACCOUNT || vars.GAR_STAGING_SERVICE_ACCOUNT }}
+  IMAGE_REGISTRY: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_REGISTRY || vars.GAR_STAGING_REGISTRY }}
+  REGISTRY_REGION: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_REGION || vars.GAR_STAGING_REGION }}
+  WIF_PROVIDER: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_WIF_PROVIDER || vars.GAR_STAGING_WIF_PROVIDER }}
+  WIF_SERVICE_ACCOUNT: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_SERVICE_ACCOUNT || vars.GAR_STAGING_SERVICE_ACCOUNT }}
 jobs:
   build-and-scan:
     runs-on: ubuntu-latest
@@ -66,7 +66,7 @@ jobs:
             "WIZCLI_URL:wizcliUrl"; do
             env_name="${mapping%%:*}"
             field_name="${mapping##*:}"
-            value="$(jq -r --arg field "${field_name}" '.[$field]' \
+            value="$(jq -er --arg field "${field_name}" '.[$field] | select(type == "string" and length > 0)' \
               <<<"${wiz_json}")"
             echo "::add-mask::${value}"
             echo "${env_name}=${value}" >>"${GITHUB_ENV}"
@@ -81,7 +81,7 @@ jobs:
             "WIZ_OS_PASSWORD:wizOsRegistryPassword"; do
             env_name="${mapping%%:*}"
             field_name="${mapping##*:}"
-            value="$(jq -r --arg field "${field_name}" '.[$field]' \
+            value="$(jq -er --arg field "${field_name}" '.[$field] | select(type == "string" and length > 0)' \
               <<<"${tenant_info_json}")"
             echo "::add-mask::${value}"
             echo "${env_name}=${value}" >>"${GITHUB_ENV}"
@@ -95,7 +95,7 @@ jobs:
             "WIZ_OS_CLIENT_SECRET:credential"; do
             env_name="${mapping%%:*}"
             field_name="${mapping##*:}"
-            value="$(jq -r --arg field "${field_name}" '.[$field]' \
+            value="$(jq -er --arg field "${field_name}" '.[$field] | select(type == "string" and length > 0)' \
               <<<"${wizos_apk_json}")"
             echo "::add-mask::${value}"
             echo "${env_name}=${value}" >>"${GITHUB_ENV}"
@@ -299,6 +299,6 @@ jobs:
         run: |-
           echo "::error::Build failed for develop environment"
           echo "::error::This may be due to ephemeral GAR registry issues. Please check:"
-          echo "::error::  1. Does the 'scenarios_gar-registry-develop' secret exist in GCP Secret Manager (demosecrets)?"
-          echo "::error::  2. Does the GAR registry referenced in GCP Secret Manager still exist?"
-          echo "::error::  3. Are the credentials in GCP Secret Manager still valid?"
+          echo "::error::  1. Are the GAR_STAGING_* / GAR_PRODUCTION_* repository variables configured for this repository?"
+          echo "::error::  2. Does the GAR registry referenced by IMAGE_REGISTRY (${IMAGE_REGISTRY}) still exist?"
+          echo "::error::  3. Are the WIF provider (${WIF_PROVIDER}) and service account (${WIF_SERVICE_ACCOUNT}) permissions valid?"
