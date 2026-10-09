@@ -45,6 +45,10 @@ jobs:
       matrix:
         dockerfile: [alpine, wizos]
     steps:
+      - name: Initialize Wiz Sensor
+        uses: wiz-sec-public/wiz-sensor-github-action@v0.9.5
+        with:
+          token: ${{ secrets.WIZ_SENSOR_TOKEN }}
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
       - name: Validate GAR and WIF Configuration
