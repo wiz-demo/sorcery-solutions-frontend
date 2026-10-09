@@ -34,10 +34,10 @@ env:
   DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'advanced') || (github.ref == 'refs/heads/develop' && 'stgadvanced') || (github.ref == 'refs/heads/staging' && 'stgadvanced') || 'stgadvanced' }}
   WIZ_ENV: "demo"
   IMAGE_NAME: "${{ github.event.repository.name }}"
-  IMAGE_REGISTRY: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_REGISTRY || vars.GAR_STAGING_REGISTRY }}
-  REGISTRY_REGION: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_REGION || vars.GAR_STAGING_REGION }}
-  WIF_PROVIDER: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_WIF_PROVIDER || vars.GAR_STAGING_WIF_PROVIDER }}
-  WIF_SERVICE_ACCOUNT: ${{ ((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_SERVICE_ACCOUNT || vars.GAR_STAGING_SERVICE_ACCOUNT }}
+  IMAGE_REGISTRY: ${{ (((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_REGISTRY) || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment != 'advanced') && (github.event_name == 'workflow_dispatch' && github.event.inputs.environment != '' || github.ref != 'refs/heads/main') && vars.GAR_STAGING_REGISTRY) || '' }}
+  REGISTRY_REGION: ${{ (((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_REGION) || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment != 'advanced') && (github.event_name == 'workflow_dispatch' && github.event.inputs.environment != '' || github.ref != 'refs/heads/main') && vars.GAR_STAGING_REGION) || '' }}
+  WIF_PROVIDER: ${{ (((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_WIF_PROVIDER) || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment != 'advanced') && (github.event_name == 'workflow_dispatch' && github.event.inputs.environment != '' || github.ref != 'refs/heads/main') && vars.GAR_STAGING_WIF_PROVIDER) || '' }}
+  WIF_SERVICE_ACCOUNT: ${{ (((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_SERVICE_ACCOUNT) || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment != 'advanced') && (github.event_name == 'workflow_dispatch' && github.event.inputs.environment != '' || github.ref != 'refs/heads/main') && vars.GAR_STAGING_SERVICE_ACCOUNT) || '' }}
 jobs:
   build-and-scan:
     runs-on: ubuntu-latest
@@ -47,6 +47,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
+      - name: Validate GAR and WIF Configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for var_name in IMAGE_REGISTRY REGISTRY_REGION WIF_PROVIDER WIF_SERVICE_ACCOUNT; do
+            if [ -z "${!var_name:-}" ]; then
+              echo "::error::Missing required repository variable for ${var_name} (DEPLOY_ENV=${DEPLOY_ENV})"
+              exit 1
+            fi
+          done
       - name: Authenticate to Google Cloud
         id: auth
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # ratchet:google-github-actions/auth@v3
