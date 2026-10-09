@@ -3,13 +3,13 @@ name: Build/Scan/Push Containers
 on:
   workflow_dispatch:
     inputs:
-      tenant:
-        description: 'Tenant (overrides branch-based logic)'
+      environment:
+        description: 'Environment (overrides branch-based logic)'
         required: false
         type: choice
         options:
-          - staging
-          - production
+          - advanced
+          - stgadvanced
       versions:
         description: 'WizCLI version to use for scanning'
         required: true
@@ -31,45 +31,85 @@ permissions:
   security-events: write
 
 env:
-  DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'advanced') || (github.ref == 'refs/heads/develop' && 'stgadvanced') || (github.ref == 'refs/heads/staging' && 'stgadvanced') || 'test' }}
+  DEPLOY_ENV: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'advanced') || (github.ref == 'refs/heads/develop' && 'stgadvanced') || (github.ref == 'refs/heads/staging' && 'stgadvanced') || 'stgadvanced' }}
   WIZ_ENV: "demo"
   IMAGE_NAME: "${{ github.event.repository.name }}"
+  IMAGE_REGISTRY: ${{ (((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_REGISTRY) || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment != 'advanced') && (github.event_name == 'workflow_dispatch' && github.event.inputs.environment != '' || github.ref != 'refs/heads/main') && vars.GAR_STAGING_REGISTRY) || '' }}
+  REGISTRY_REGION: ${{ (((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_REGION) || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment != 'advanced') && (github.event_name == 'workflow_dispatch' && github.event.inputs.environment != '' || github.ref != 'refs/heads/main') && vars.GAR_STAGING_REGION) || '' }}
+  WIF_PROVIDER: ${{ (((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_WIF_PROVIDER) || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment != 'advanced') && (github.event_name == 'workflow_dispatch' && github.event.inputs.environment != '' || github.ref != 'refs/heads/main') && vars.GAR_STAGING_WIF_PROVIDER) || '' }}
+  WIF_SERVICE_ACCOUNT: ${{ (((github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'advanced') || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment == '') && github.ref == 'refs/heads/main')) && vars.GAR_PRODUCTION_SERVICE_ACCOUNT) || ((github.event_name != 'workflow_dispatch' || github.event.inputs.environment != 'advanced') && (github.event_name == 'workflow_dispatch' && github.event.inputs.environment != '' || github.ref != 'refs/heads/main') && vars.GAR_STAGING_SERVICE_ACCOUNT) || '' }}
 jobs:
   build-and-scan:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-
         dockerfile: [alpine, wizos]
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # ratchet:actions/checkout@v6.0.2
-      - name: Configure 1Password Service Account
-        uses: 1password/load-secrets-action/configure@dafbe7cb03502b260e2b2893c753c352eee545bf # ratchet:1password/load-secrets-action/configure@v3.2.1
-
+      - name: Validate GAR and WIF Configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for var_name in IMAGE_REGISTRY REGISTRY_REGION WIF_PROVIDER WIF_SERVICE_ACCOUNT; do
+            if [ -z "${!var_name:-}" ]; then
+              echo "::error::Missing required repository variable for ${var_name} (DEPLOY_ENV=${DEPLOY_ENV})"
+              exit 1
+            fi
+          done
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # ratchet:google-github-actions/auth@v3
         with:
-          service-account-token: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
-      - name: Load Environment Secrets
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
+      - name: Load Environment Secrets from GCP Secret Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          wiz_json="$(gcloud secrets versions access latest \
+            --project=demosecrets \
+            --secret="tenant_${DEPLOY_ENV}-wizcli-sa")"
+          for mapping in \
+            "WIZ_CLIENT_ID:username" \
+            "WIZ_CLIENT_SECRET:password" \
+            "WIZCLI_URL:wizcliUrl"; do
+            env_name="${mapping%%:*}"
+            field_name="${mapping##*:}"
+            value="$(jq -er --arg field "${field_name}" '.[$field] | select(type == "string" and length > 0)' \
+              <<<"${wiz_json}")"
+            echo "::add-mask::${value}"
+            echo "${env_name}=${value}" >>"${GITHUB_ENV}"
+          done
 
-        uses: 1password/load-secrets-action@dafbe7cb03502b260e2b2893c753c352eee545bf # ratchet:1password/load-secrets-action@v3.2.1
-        with:
-          export-env: true
-        env:
+          tenant_info_json="$(gcloud secrets versions access latest \
+            --project=demosecrets \
+            --secret="tenant_${DEPLOY_ENV}-tenant-info")"
+          for mapping in \
+            "WIZ_OS_REGISTRY:wizOsRegistryUrl" \
+            "WIZ_OS_USER:wizOsRegistryUsername" \
+            "WIZ_OS_PASSWORD:wizOsRegistryPassword"; do
+            env_name="${mapping%%:*}"
+            field_name="${mapping##*:}"
+            value="$(jq -er --arg field "${field_name}" '.[$field] | select(type == "string" and length > 0)' \
+              <<<"${tenant_info_json}")"
+            echo "::add-mask::${value}"
+            echo "${env_name}=${value}" >>"${GITHUB_ENV}"
+          done
 
-          IMAGE_REGISTRY: op://wiz-demo/gar_${{ env.DEPLOY_ENV }}-registry/registryUrl
-          REGISTRY_REGION: op://wiz-demo/gar_${{ env.DEPLOY_ENV }}-registry/registryRegion
-          WIF_PROVIDER: op://wiz-demo/gar_${{ env.DEPLOY_ENV }}-registry/workloadIdentityProvider
-          WIF_SERVICE_ACCOUNT: op://wiz-demo/gar_${{ env.DEPLOY_ENV }}-registry/pusherServiceAccount
-          WIZ_CLIENT_ID: op://wiz-demo/tenant_${{ env.DEPLOY_ENV}}-wizcli-sa/username
-          WIZ_CLIENT_SECRET: op://wiz-demo/tenant_${{ env.DEPLOY_ENV }}-wizcli-sa/password
-          WIZCLI_URL: op://wiz-demo/tenant_${{ env.DEPLOY_ENV }}-wizcli-sa/wizcliUrl
-          WIZ_OS_REGISTRY: op://wiz-demo/tenant_${{ env.DEPLOY_ENV == 'stgadvanced' && 'adv-stg' || 'adv-prod' }}-tenant-info/wizOsRegistryUrl
-          WIZ_OS_USER: op://wiz-demo/tenant_${{ env.DEPLOY_ENV == 'stgadvanced' && 'adv-stg' || 'adv-prod' }}-tenant-info/wizOsRegistryUsername
-          WIZ_OS_PASSWORD: op://wiz-demo/tenant_${{ env.DEPLOY_ENV == 'stgadvanced' && 'adv-stg' || 'adv-prod' }}-tenant-info/wizOsRegistryPassword
-          WIZ_OS_CLIENT_ID: op://wiz-demo/tenant_${{ env.DEPLOY_ENV }}-wizos-apk-credentials/username
-          WIZ_OS_CLIENT_SECRET: op://wiz-demo/tenant_${{ env.DEPLOY_ENV }}-wizos-apk-credentials/credential
-
-
+          wizos_apk_json="$(gcloud secrets versions access latest \
+            --project=demosecrets \
+            --secret="tenant_${DEPLOY_ENV}-wizos-apk-credentials")"
+          for mapping in \
+            "WIZ_OS_CLIENT_ID:username" \
+            "WIZ_OS_CLIENT_SECRET:credential"; do
+            env_name="${mapping%%:*}"
+            field_name="${mapping##*:}"
+            value="$(jq -er --arg field "${field_name}" '.[$field] | select(type == "string" and length > 0)' \
+              <<<"${wizos_apk_json}")"
+            echo "::add-mask::${value}"
+            echo "${env_name}=${value}" >>"${GITHUB_ENV}"
+          done
       - name: Get Wiz CLI SHA256
         id: get-sha256
         run: |
@@ -99,24 +139,14 @@ jobs:
       - name: Collect Docker Metadata
         id: meta
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # ratchet:docker/metadata-action@v5.10.0
-
-
         with:
           images: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}-${{ matrix.dockerfile }}
-
           tags: |
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=${{ env.DEPLOY_ENV }}-${{ matrix.dockerfile }}-{{sha}}
-      - name: Authenticate to Google Cloud
-        id: auth
-        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # ratchet:google-github-actions/auth@v3
-        with:
-          workload_identity_provider: ${{ env.WIF_PROVIDER }}
-
-          service_account: ${{ env.WIF_SERVICE_ACCOUNT }}
       - name: Login to Container Registry
         run: gcloud auth configure-docker ${{ env.REGISTRY_REGION }}-docker.pkg.dev
       - name: Login to Wiz OS Container Registry
@@ -279,11 +309,6 @@ jobs:
         run: |-
           echo "::error::Build failed for develop environment"
           echo "::error::This may be due to ephemeral GAR registry issues. Please check:"
-          echo "::error::  1. Does the 'scenarios_gar-registry-develop' entry exist in 1Password?"
-          echo "::error::  2. Does the GAR registry referenced in 1Password still exist?"
-          echo "::error::  3. Are the credentials in 1Password still valid?"
-          echo "::error::"
-          echo "::error::If the develop GAR registry was deleted, you may need to:"
-          echo "::error::  - Create a new develop GAR registry"
-          echo "::error::  - Update the 'scenarios_gar-registry-develop' entry in 1Password with new registry details"
-          echo "::error::  - Or remove the 1Password entry if develop environment is no longer needed"
+          echo "::error::  1. Are the GAR_STAGING_* / GAR_PRODUCTION_* repository variables configured for this repository?"
+          echo "::error::  2. Does the GAR registry referenced by IMAGE_REGISTRY (${IMAGE_REGISTRY}) still exist?"
+          echo "::error::  3. Are the WIF provider (${WIF_PROVIDER}) and service account (${WIF_SERVICE_ACCOUNT}) permissions valid?"
