@@ -36,6 +36,7 @@ export default function SpellbookPage() {
         <div className="space-x-4">
           <Link href="/" className="hover:underline hover:text-pink-200">Home</Link>
           <Link href="/spellbook" className="hover:underline hover:text-pink-200">Spellbook</Link>
+          <Link href="/wizard-databot" className="hover:underline hover:text-pink-200">Wizard Databot</Link>
         </div>
       </nav>
 
